@@ -32,8 +32,6 @@ const char *kMetadataColumnFamilyName = "metadata";
 const char *kSubkeyColumnFamilyName = "default";
 const char *kPropagateColumnFamilyName = "propagate";
 
-const char *kPropagateScriptCommand = "script";
-
 const char *kLuaFunctionPrefix = "lua_f_";
 
 const uint64_t kIORateLimitMaxMb = 1024000;
@@ -453,14 +451,6 @@ rocksdb::Status Storage::DeleteRange(const std::string &first_key, const std::st
     return s;
   }
   return rocksdb::Status::OK();
-}
-
-rocksdb::Status Storage::FlushScripts(const rocksdb::WriteOptions &options, rocksdb::ColumnFamilyHandle *cf_handle) {
-  std::string begin_key = kLuaFunctionPrefix, end_key = begin_key;
-  // we need to increase one here since the DeleteRange api
-  // didn't contain the end key.
-  end_key[end_key.size()-1] += 1;
-  return db_->DeleteRange(options, cf_handle, begin_key, end_key);
 }
 
 Status Storage::WriteBatch(std::string &&raw_batch) {

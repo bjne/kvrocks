@@ -78,7 +78,8 @@ class PropagateFilter : public rocksdb::CompactionFilter {
               std::string *new_value, bool *modified) const override {
     // We propagate Lua commands which don't store data,
     // just in order to implement updating Lua state.
-    return key == Engine::kPropagateScriptCommand;
+    //return key == Engine::kPropagateScriptCommand;
+    return false;
   }
 };
 

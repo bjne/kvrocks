@@ -17,7 +17,6 @@
 #include "redis_connection.h"
 #include "compaction_checker.h"
 #include "config.h"
-#include "scripting.h"
 
 std::atomic<int>Server::unix_time_ = {0};
 
@@ -39,7 +38,6 @@ Server::Server(Engine::Storage *storage, Config *config) :
   }
   slow_log_.SetMaxEntries(config->slowlog_max_len);
   perf_log_.SetMaxEntries(config->profiling_sample_record_max_len);
-  lua_ = Lua::CreateState();
   fetch_file_threads_num_ = 0;
   time(&start_time_);
   stop_ = false;
@@ -672,16 +670,12 @@ void Server::GetClientsInfo(std::string *info) {
 
 void Server::GetMemoryInfo(std::string *info) {
   std::ostringstream string_stream;
-  char used_memory_rss_human[16], used_memory_lua_human[16];
+  char used_memory_rss_human[16];
   int64_t rss = Stats::GetMemoryRSS();
   Util::BytesToHuman(used_memory_rss_human, 16, static_cast<uint64_t>(rss));
-  int memory_lua = lua_gc(lua_, LUA_GCCOUNT, 0)*1024;
-  Util::BytesToHuman(used_memory_lua_human, 16, static_cast<uint64_t>(memory_lua));
   string_stream << "# Memory\r\n";
   string_stream << "used_memory_rss:" << rss <<"\r\n";
   string_stream << "used_memory_human:" << used_memory_rss_human << "\r\n";
-  string_stream << "used_memory_lua:" << memory_lua << "\r\n";
-  string_stream << "used_memory_lua_human:" << used_memory_lua_human << "\r\n";
   *info = string_stream.str();
 }
 
@@ -1235,38 +1229,6 @@ Status Server::LookupAndCreateCommand(const std::string &cmd_name,
   return Status::OK();
 }
 
-Status Server::ScriptExists(const std::string &sha) {
-  std::string body;
-  return ScriptGet(sha, &body);
-}
-
-Status Server::ScriptGet(const std::string &sha, std::string *body) {
-  std::string funcname = Engine::kLuaFunctionPrefix + sha;
-  auto cf = storage_->GetCFHandle(Engine::kPropagateColumnFamilyName);
-  auto s = storage_->GetDB()->Get(rocksdb::ReadOptions(), cf, funcname, body);
-  if (!s.ok()) {
-    if (s.IsNotFound()) return Status(Status::NotFound);
-    return Status(Status::NotOK, s.ToString());
-  }
-  return Status::OK();
-}
-
-void Server::ScriptSet(const std::string &sha, const std::string &body) {
-  std::string funcname = Engine::kLuaFunctionPrefix + sha;
-  WriteToPropagateCF(funcname, body);
-}
-
-void Server::ScriptReset() {
-  Lua::DestroyState(lua_);
-  lua_ = Lua::CreateState();
-}
-
-void Server::ScriptFlush() {
-  auto cf = storage_->GetCFHandle(Engine::kPropagateColumnFamilyName);
-  storage_->FlushScripts(rocksdb::WriteOptions(), cf);
-  ScriptReset();
-}
-
 Status Server::WriteToPropagateCF(const std::string &key, const std::string &value) const {
   rocksdb::WriteBatch batch;
   auto propagateCf = storage_->GetCFHandle(Engine::kPropagateColumnFamilyName);
@@ -1289,22 +1251,4 @@ Status Server::Propagate(const std::string &channel, const std::vector<std::stri
     value += Redis::BulkString(iter);
   }
   return WriteToPropagateCF(channel, value);
-}
-
-Status Server::ExecPropagateScriptCommand(const std::vector<std::string> &tokens) {
-  auto subcommand = Util::ToLower(tokens[1]);
-  if (subcommand == "flush") {
-    ScriptReset();
-  }
-  return Status::OK();
-}
-
-Status Server::ExecPropagatedCommand(const std::vector<std::string> &tokens) {
-  if (tokens.empty()) return Status::OK();
-
-  auto command = Util::ToLower(tokens[0]);
-  if (command == "script" && tokens.size() >= 2) {
-    return ExecPropagateScriptCommand(tokens);
-  }
-  return Status::OK();
 }

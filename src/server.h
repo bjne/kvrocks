@@ -10,9 +10,9 @@
 #include <memory>
 #include <unordered_map>
 
-extern "C" {
-#include <lua.h>
-}
+//extern "C" {
+//#include <lua.h>
+//}
 
 #include "stats.h"
 #include "storage.h"
@@ -125,17 +125,9 @@ class Server {
   void KillClient(int64_t *killed, std::string addr, uint64_t id, uint64_t type,
                   bool skipme, Redis::Connection *conn);
 
-  lua_State *Lua() { return lua_; }
-  Status ScriptExists(const std::string &sha);
-  Status ScriptGet(const std::string &sha, std::string *body);
-  void ScriptSet(const std::string &sha, const std::string &body);
-  void ScriptReset();
-  void ScriptFlush();
-
   Status WriteToPropagateCF(const std::string &key, const std::string &value) const;
   Status Propagate(const std::string &channel, const std::vector<std::string> &tokens);
   Status ExecPropagatedCommand(const std::vector<std::string> &tokens);
-  Status ExecPropagateScriptCommand(const std::vector<std::string> &tokens);
 
   void SetCurrentConnection(Redis::Connection *conn) { curr_connection_ = conn; }
   Redis::Connection *GetCurrentConnection() { return curr_connection_; }
@@ -169,7 +161,7 @@ class Server {
   std::string last_random_key_cursor_;
   std::mutex last_random_key_cursor_mu_;
 
-  lua_State *lua_;
+  //lua_State *lua_;
 
   Redis::Connection *curr_connection_ = nullptr;
 

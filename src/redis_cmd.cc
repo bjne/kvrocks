@@ -31,7 +31,6 @@
 #include "server.h"
 #include "log_collector.h"
 #include "cluster.h"
-#include "scripting.h"
 
 namespace Redis {
 
@@ -4297,75 +4296,6 @@ class CommandClusterX : public Commander {
   bool force_ = false;
 };
 
-class CommandEval : public Commander {
- public:
-  Status Parse(const std::vector<std::string> &args) override {
-    return Status::OK();
-  }
-
-  Status Execute(Server *svr, Connection *conn, std::string *output) override {
-    return Lua::evalGenericCommand(conn, args_, false, output);
-  }
-};
-
-class CommandEvalSHA : public Commander {
- public:
-  Status Parse(const std::vector<std::string> &args) override {
-    if (args[1].size() != 40) {
-      return Status(Status::NotOK,  "NOSCRIPT No matching script. Please use EVAL");
-    }
-    return Status::OK();
-  }
-
-  Status Execute(Server *svr, Connection *conn, std::string *output) override {
-    return Lua::evalGenericCommand(conn, args_, true, output);
-  }
-};
-
-class CommandScript : public Commander {
- public:
-  Status Parse(const std::vector<std::string> &args) override {
-    subcommand_ = Util::ToLower(args[1]);
-    return Status::OK();
-  }
-
-  Status Execute(Server *svr, Connection *conn, std::string *output) override {
-    // There's a little tricky here since the script command was the write type
-    // command but some subcommands like `exists` were readonly, so we want to allow
-    // executing on slave here. Maybe we should find other way to do this.
-    if (svr->IsSlave() && subcommand_ != "exists") {
-      return Status(Status::NotOK, "READONLY You can't write against a read only slave");
-    }
-    if (args_.size() == 2 && subcommand_ == "flush") {
-      svr->ScriptFlush();
-      svr->Propagate(Engine::kPropagateScriptCommand, args_);
-      *output = Redis::SimpleString("OK");
-    } else if (args_.size() >= 2 && subcommand_ == "exists") {
-      *output = Redis::MultiLen(args_.size()-2);
-      for (size_t j = 2; j < args_.size(); j++) {
-        if (svr->ScriptExists(args_[j]).IsOK()) {
-          *output += Redis::Integer(1);
-        } else {
-          *output += Redis::Integer(0);
-        }
-      }
-    } else if (args_.size() == 3 && subcommand_ == "load") {
-      std::string sha;
-      auto s = Lua::createFunction(svr, args_[2], &sha);
-      if (!s.IsOK()) {
-        return s;
-      }
-      *output = Redis::SimpleString(sha);
-    } else {
-      return Status(Status::NotOK, "Unknown SCRIPT subcommand or wrong # of args");
-    }
-    return Status::OK();
-  }
-
- private:
-  std::string subcommand_;
-};
-
 #define ADD_CMD(name, arity, description , first_key, last_key, key_step, fn) \
 {name, arity, description, 0, first_key, last_key, key_step, []() -> std::unique_ptr<Commander> { \
   return std::unique_ptr<Commander>(new fn()); \
@@ -4536,10 +4466,6 @@ CommandAttributes redisCommandTable[] = {
     ADD_CMD("cluster", -2, "cluster no-script", 0, 0, 0, CommandCluster),
     ADD_CMD("clusterx", -2, "cluster no-script", 0, 0, 0, CommandClusterX),
 
-    ADD_CMD("eval", -3, "exclusive write no-script", 0, 0, 0, CommandEval),
-    ADD_CMD("evalsha", -3, "exclusive write no-script", 0, 0, 0, CommandEvalSHA),
-    ADD_CMD("script", -2, "exclusive no-script", 0, 0, 0, CommandScript),
-
     ADD_CMD("compact", 1, "read-only no-script", 0, 0, 0, CommandCompact),
     ADD_CMD("bgsave", 1, "read-only no-script", 0, 0, 0, CommandBGSave),
     ADD_CMD("flushbackup", 1, "read-only no-script", 0, 0, 0, CommandFlushBackup),
@@ -4591,7 +4517,6 @@ void InitCommandsTable() {
       if (flag == "exclusive") redisCommandTable[i].flags |= kCmdExclusive;
       if (flag == "multi") redisCommandTable[i].flags |= kCmdMulti;
       if (flag == "no-multi") redisCommandTable[i].flags |= kCmdNoMulti;
-      if (flag == "no-script") redisCommandTable[i].flags |= kCmdNoScript;
     }
   }
 }

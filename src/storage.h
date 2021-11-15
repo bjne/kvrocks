@@ -31,8 +31,6 @@ extern const char *kMetadataColumnFamilyName;
 extern const char *kSubkeyColumnFamilyName;
 extern const char *kPropagateColumnFamilyName;
 
-extern const char *kPropagateScriptCommand;
-
 extern const char *kLuaFunctionPrefix;
 
 class Storage {
@@ -63,7 +61,6 @@ class Storage {
                          rocksdb::ColumnFamilyHandle *cf_handle,
                          const rocksdb::Slice &key);
   rocksdb::Status DeleteRange(const std::string &first_key, const std::string &last_key);
-  rocksdb::Status FlushScripts(const rocksdb::WriteOptions &options, rocksdb::ColumnFamilyHandle *cf_handle);
   bool WALHasNewData(rocksdb::SequenceNumber seq) { return seq <= LatestSeq(); }
 
   rocksdb::Status Compact(const rocksdb::Slice *begin, const rocksdb::Slice *end);

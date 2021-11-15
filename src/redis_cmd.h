@@ -28,12 +28,10 @@ enum CommandFlags {
   kCmdReadOnly      = (1ULL<<1),  // "read-only" flag
   kCmdReplication   = (1ULL<<2),  // "replication" flag
   kCmdPubSub        = (1ULL<<3),  // "pub-sub" flag
-  kCmdScript        = (1ULL<<4),  // "script" flag
   kCmdLoading       = (1ULL<<5),  // "ok-loading" flag
   kCmdMulti         = (1ULL<<6),  // "multi" flag
   kCmdExclusive     = (1ULL<<7),  // "exclusive" flag
   kCmdNoMulti       = (1ULL<<8),  // "no-multi" flag
-  kCmdNoScript      = (1ULL<<9),  // "noscript" flag
 };
 
 class Commander {

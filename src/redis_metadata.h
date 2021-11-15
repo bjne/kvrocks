@@ -14,7 +14,6 @@ enum RedisType {
   kRedisHash,
   kRedisList,
   kRedisSet,
-  kRedisZSet,
 };
 
 enum RedisCommand {
@@ -31,7 +30,7 @@ enum RedisCommand {
 
 const std::vector<std::string> RedisTypeNames = {
     "none", "string", "hash",
-    "list", "set", "zset"
+    "list", "set"
 };
 
 const char kErrMsgWrongType[] = "WRONGTYPE Operation against a key holding the wrong kind of value";
@@ -104,11 +103,6 @@ class HashMetadata : public Metadata {
 class SetMetadata : public Metadata {
  public:
   explicit SetMetadata(bool generate_version = true): Metadata(kRedisSet, generate_version) {}
-};
-
-class ZSetMetadata : public Metadata {
- public:
-  explicit ZSetMetadata(bool generate_version = true): Metadata(kRedisZSet, generate_version){}
 };
 
 class ListMetadata : public Metadata {

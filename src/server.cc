@@ -101,8 +101,7 @@ Status Server::Start() {
         if (local_time.tm_hour >= config_->compaction_checker_range.Start
         && local_time.tm_hour <= config_->compaction_checker_range.Stop) {
           std::vector<std::string> cf_names = {Engine::kMetadataColumnFamilyName,
-                                               Engine::kSubkeyColumnFamilyName,
-                                               Engine::kZSetScoreColumnFamilyName};
+                                               Engine::kSubkeyColumnFamilyName};
           for (const auto &cf_name : cf_names) {
             compaction_checker.PickCompactionFiles(cf_name);
           }

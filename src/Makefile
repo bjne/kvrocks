@@ -34,8 +34,8 @@ FINAL_LIBS+= $(GLOG) $(LIBEVENT) $(LIBEVENT_PTHREADS) $(JEMALLOC) $(ROCKSDB)
 SHARED_OBJS= cluster.o compact_filter.o config.o cron.o encoding.o event_listener.o lock_manager.o \
 			   log_collector.o redis_bitmap.o redis_bitmap_string.o redis_cmd.o redis_connection.o redis_db.o \
 			   redis_hash.o redis_list.o redis_metadata.o redis_slot.o redis_pubsub.o redis_reply.o \
-			   redis_request.o redis_set.o redis_string.o redis_zset.o redis_geo.o replication.o \
-			   server.o stats.o storage.o task_runner.o util.o geohash.o worker.o redis_sortedint.o \
+			   redis_request.o redis_set.o redis_string.o redis_zset.o replication.o \
+			   server.o stats.o storage.o task_runner.o util.o worker.o redis_sortedint.o \
 			   compaction_checker.o table_properties_collector.o rand.o
 KVROCKS_OBJS= $(SHARED_OBJS) main.o
 
@@ -43,7 +43,7 @@ UNITTEST_OBJS= $(SHARED_OBJS) ../tests/main.o ../tests/t_metadata_test.o ../test
 			   ../tests/config_test.o ../tests/cron_test.o ../tests/log_collector_test.o ../tests/cluster_test.o \
 			   ../tests/rwlock_test.o ../tests/string_reply_test.o ../tests/string_util_test.o ../tests/t_bitmap_test.o \
 			   ../tests/t_encoding_test.o ../tests/t_hash_test.o ../tests/t_list_test.o ../tests/t_set_test.o \
-			   ../tests/task_runner_test.o  ../tests/t_string_test.o ../tests/t_zset_test.o ../tests/t_geo_test.o \
+			   ../tests/task_runner_test.o  ../tests/t_string_test.o ../tests/t_zset_test.o \
 			    ../tests/t_sortedint_test.o
 
 K2RDIR= ../tools/kvrocks2redis

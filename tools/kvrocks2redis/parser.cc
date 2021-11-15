@@ -2,7 +2,6 @@
 
 #include <rocksdb/write_batch.h>
 
-#include "../../src/redis_bitmap.h"
 #include "parser.h"
 #include "util.h"
 
@@ -54,7 +53,7 @@ Status Parser::parseSimpleKV(const Slice &ns_key, const Slice &value, int expire
 
 Status Parser::parseComplexKV(const Slice &ns_key, const Metadata &metadata) {
   RedisType type = metadata.Type();
-  if (type < kRedisHash || type > kRedisBitmap) {
+  if (type < kRedisHash || type > kRedisZSet) {
     return Status(Status::NotOK, "unknown metadata type: " + std::to_string(type));
   }
 
@@ -87,16 +86,9 @@ Status Parser::parseComplexKV(const Slice &ns_key, const Metadata &metadata) {
         output = Rocksdb2Redis::Command2RESP({"ZADD", user_key, std::to_string(score), sub_key});
         break;
       }
-      case kRedisBitmap: {
-        int index = std::stoi(sub_key);
-        s = Parser::parseBitmapSegment(ns, user_key, index, value);
-        break;
-      }
       default:break;  // should never get here
     }
-    if (type != kRedisBitmap) {
-      s = writer_->Write(ns, {output});
-    }
+    s = writer_->Write(ns, {output});
     if (!s.IsOK()) return s;
   }
 
@@ -110,20 +102,6 @@ Status Parser::parseComplexKV(const Slice &ns_key, const Metadata &metadata) {
   return Status::OK();
 }
 
-Status Parser::parseBitmapSegment(const Slice &ns, const Slice &user_key, int index, const Slice &bitmap) {
-  Status s;
-  for (size_t i = 0; i < bitmap.size(); i++) {
-    if (bitmap[i] == 0) continue;  // ignore zero byte
-    for (int j = 0; j < 8; j++) {
-      if (!(bitmap[i] & (1 << j))) continue;  // ignore zero bit
-      s = writer_->Write(ns.ToString(), {Rocksdb2Redis::Command2RESP(
-          {"SETBIT", user_key.ToString(), std::to_string(index * 8 + i * 8 + j), "1"})
-      });
-      if (!s.IsOK()) return s;
-    }
-  }
-  return Status::OK();
-}
 
 rocksdb::Status Parser::ParseWriteBatch(const std::string &batch_string) {
   rocksdb::WriteBatch write_batch(batch_string);
@@ -225,16 +203,6 @@ rocksdb::Status WriteBatchExtractor::PutCF(uint32_t column_family_id, const Slic
       case kRedisZSet: {
         double score = DecodeDouble(value.data());
         command_args = {"ZADD", user_key, std::to_string(score), sub_key};
-        break;
-      }
-      case kRedisBitmap: {
-        auto args = log_data_.GetArguments();
-        if (args->size() < 1) {
-          LOG(ERROR) << "Fail to parse write_batch in putcf cmd setbit : args error ,should contain setbit offset";
-          return rocksdb::Status::OK();
-        }
-        bool bit_value = Redis::Bitmap::GetBitFromValueAndOffset(value.ToString(), std::stoi((*args)[0]));
-        command_args = {"SETBIT", user_key, (*args)[0], bit_value ? "1" : "0"};
         break;
       }
       default: break;

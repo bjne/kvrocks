@@ -32,7 +32,7 @@ CompactOnExpiredCollector::AddUserKey(const rocksdb::Slice &key, const rocksdb::
   GetFixed8(&cv, &type);
   GetFixed32(&cv, &expired);
   type = type & (uint8_t)0x0f;
-  if (type == kRedisBitmap || type == kRedisSet || type == kRedisList ||
+  if (type == kRedisSet || type == kRedisList ||
       type == kRedisHash || type == kRedisZSet || type == kRedisSortedint) {
       if (cv.size() <= 12) return rocksdb::Status::OK();
       GetFixed64(&cv, &version);

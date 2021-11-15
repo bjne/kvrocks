@@ -13,7 +13,6 @@
 #include "redis_db.h"
 #include "redis_cmd.h"
 #include "redis_hash.h"
-#include "redis_bitmap.h"
 #include "redis_list.h"
 #include "redis_request.h"
 #include "redis_connection.h"
@@ -665,115 +664,6 @@ Status getBitOffsetFromArgument(std::string arg, uint32_t *offset) {
   *offset = static_cast<uint32_t>(offset_arg);
   return Status::OK();
 }
-
-class CommandGetBit : public Commander {
- public:
-  Status Parse(const std::vector<std::string> &args) override {
-    Status s = getBitOffsetFromArgument(args[2], &offset_);
-    if (!s.IsOK()) return s;
-    return Commander::Parse(args);
-  }
-  Status Execute(Server *svr, Connection *conn, std::string *output) override {
-    bool bit;
-    Redis::Bitmap bitmap_db(svr->storage_, conn->GetNamespace());
-    rocksdb::Status s = bitmap_db.GetBit(args_[1], offset_, &bit);
-    if (!s.ok()) return Status(Status::RedisExecErr, s.ToString());
-    *output = Redis::Integer(bit ? 1 : 0);
-    return Status::OK();
-  }
- private:
-  uint32_t offset_ = 0;
-};
-
-class CommandSetBit : public Commander {
- public:
-  Status Parse(const std::vector<std::string> &args) override {
-    Status s = getBitOffsetFromArgument(args[2], &offset_);
-    if (!s.IsOK()) return s;
-
-    if (args[3] == "0") {
-      bit_ = false;
-    } else if (args[3] == "1") {
-      bit_ = true;
-    } else {
-      return Status(Status::RedisParseErr, "bit is out of range");
-    }
-    return Commander::Parse(args);
-  }
-
-  Status Execute(Server *svr, Connection *conn, std::string *output) override {
-    bool old_bit;
-    Redis::Bitmap bitmap_db(svr->storage_, conn->GetNamespace());
-    rocksdb::Status s = bitmap_db.SetBit(args_[1], offset_, bit_, &old_bit);
-    if (!s.ok()) return Status(Status::RedisExecErr, s.ToString());
-    *output = Redis::Integer(old_bit ? 1 : 0);
-    return Status::OK();
-  }
-
- private:
-  uint32_t offset_ = 0;
-  bool bit_ = false;
-};
-
-class CommandBitCount : public Commander {
- public:
-  Status Parse(const std::vector<std::string> &args) override {
-    try {
-      if (args.size() >= 3) start_ = std::stoi(args[2]);
-      if (args.size() >= 4) stop_ = std::stoi(args[3]);
-    } catch (std::exception &e) {
-      return Status(Status::RedisParseErr, errValueNotInterger);
-    }
-    return Commander::Parse(args);
-  }
-
-  Status Execute(Server *svr, Connection *conn, std::string *output) override {
-    uint32_t cnt;
-    Redis::Bitmap bitmap_db(svr->storage_, conn->GetNamespace());
-    rocksdb::Status s = bitmap_db.BitCount(args_[1], start_, stop_, &cnt);
-    if (!s.ok()) return Status(Status::RedisExecErr, s.ToString());
-    *output = Redis::Integer(cnt);
-    return Status::OK();
-  }
- private:
-  int start_ = 0, stop_ = -1;
-};
-
-class CommandBitPos: public Commander {
- public:
-  Status Parse(const std::vector<std::string> &args) override {
-    try {
-      if (args.size() >= 4) start_ = std::stoi(args[3]);
-      if (args.size() >= 5) {
-        stop_given_ = true;
-        stop_ = std::stoi(args[4]);
-      }
-    } catch (std::exception &e) {
-      return Status(Status::RedisParseErr, errValueNotInterger);
-    }
-    if (args[2] == "0") {
-      bit_ = false;
-    } else if (args[2] == "1") {
-      bit_ = true;
-    } else {
-      return Status(Status::RedisParseErr, "bit should be 0 or 1");
-    }
-    return Commander::Parse(args);
-  }
-
-  Status Execute(Server *svr, Connection *conn, std::string *output) override {
-    int pos;
-    Redis::Bitmap bitmap_db(svr->storage_, conn->GetNamespace());
-    rocksdb::Status s = bitmap_db.BitPos(args_[1], bit_, start_, stop_, stop_given_, &pos);
-    if (!s.ok()) return Status(Status::RedisExecErr, s.ToString());
-    *output = Redis::Integer(pos);
-    return Status::OK();
-  }
-
- private:
-  int start_ = 0, stop_ = -1;
-  bool bit_ = false, stop_given_ = false;
-};
 
 class CommandType : public Commander {
  public:
@@ -4007,11 +3897,6 @@ CommandAttributes redisCommandTable[] = {
     ADD_CMD("incr", 2, "write", 1, 1, 1, CommandIncr),
     ADD_CMD("decrby", 3, "write", 1, 1, 1, CommandDecrBy),
     ADD_CMD("decr", 2, "write", 1, 1, 1, CommandDecr),
-
-    ADD_CMD("getbit", 3, "read-only", 1, 1, 1, CommandGetBit),
-    ADD_CMD("setbit", 4, "write", 1, 1, 1, CommandSetBit),
-    ADD_CMD("bitcount", -2, "read-only", 1, 1, 1, CommandBitCount),
-    ADD_CMD("bitpos", -3, "read-only", 1, 1, 1, CommandBitPos),
 
     ADD_CMD("hget", 3, "read-only", 1, 1, 1, CommandHGet),
     ADD_CMD("hincrby", 4, "write", 1, 1, 1, CommandHIncrBy),

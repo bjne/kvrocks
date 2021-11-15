@@ -2,7 +2,6 @@
 #include <string>
 #include <utility>
 #include <glog/logging.h>
-#include "redis_bitmap.h"
 
 namespace Engine {
 using rocksdb::Slice;
@@ -79,7 +78,8 @@ bool SubKeyFilter::IsKeyExpired(const InternalKey &ikey, const Slice &value) con
       || ikey.GetVersion() != metadata.version) {
     return true;
   }
-  return metadata.Type() == kRedisBitmap && Redis::Bitmap::IsEmptySegment(value);
+
+  return false;
 }
 
 bool SubKeyFilter::Filter(int level,

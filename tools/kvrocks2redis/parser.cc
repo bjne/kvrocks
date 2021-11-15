@@ -53,7 +53,7 @@ Status Parser::parseSimpleKV(const Slice &ns_key, const Slice &value, int expire
 
 Status Parser::parseComplexKV(const Slice &ns_key, const Metadata &metadata) {
   RedisType type = metadata.Type();
-  if (type < kRedisHash || type > kRedisZSet) {
+  if (type < kRedisHash) {
     return Status(Status::NotOK, "unknown metadata type: " + std::to_string(type));
   }
 
@@ -81,11 +81,6 @@ Status Parser::parseComplexKV(const Slice &ns_key, const Metadata &metadata) {
         break;
       case kRedisList:output = Rocksdb2Redis::Command2RESP({"RPUSH", user_key, value});
         break;
-      case kRedisZSet: {
-        double score = DecodeDouble(value.data());
-        output = Rocksdb2Redis::Command2RESP({"ZADD", user_key, std::to_string(score), sub_key});
-        break;
-      }
       default:break;  // should never get here
     }
     s = writer_->Write(ns, {output});
@@ -126,10 +121,6 @@ void WriteBatchExtractor::LogData(const rocksdb::Slice &blob) {
 
 rocksdb::Status WriteBatchExtractor::PutCF(uint32_t column_family_id, const Slice &key,
                                            const Slice &value) {
-  if (column_family_id == kColumnFamilyIDZSetScore) {
-    return rocksdb::Status::OK();
-  }
-
   std::string ns, user_key, sub_key;
   std::vector<std::string> command_args;
   if (column_family_id == kColumnFamilyIDMetadata) {
@@ -200,11 +191,6 @@ rocksdb::Status WriteBatchExtractor::PutCF(uint32_t column_family_id, const Slic
       }
       case kRedisSet:command_args = {"SADD", user_key, sub_key};
         break;
-      case kRedisZSet: {
-        double score = DecodeDouble(value.data());
-        command_args = {"ZADD", user_key, std::to_string(score), sub_key};
-        break;
-      }
       default: break;
     }
   }
@@ -216,10 +202,6 @@ rocksdb::Status WriteBatchExtractor::PutCF(uint32_t column_family_id, const Slic
 }
 
 rocksdb::Status WriteBatchExtractor::DeleteCF(uint32_t column_family_id, const Slice &key) {
-  if (column_family_id == kColumnFamilyIDZSetScore) {
-    return rocksdb::Status::OK();
-  }
-
   std::string ns, user_key, sub_key;
   std::vector<std::string> command_args;
   if (column_family_id == kColumnFamilyIDMetadata) {
@@ -234,8 +216,6 @@ rocksdb::Status WriteBatchExtractor::DeleteCF(uint32_t column_family_id, const S
       case kRedisHash: command_args = {"HDEL", user_key, sub_key};
         break;
       case kRedisSet: command_args = {"SREM", user_key, sub_key};
-        break;
-      case kRedisZSet: command_args = {"ZREM", user_key, sub_key};
         break;
       case kRedisList: {
         auto args = log_data_.GetArguments();
